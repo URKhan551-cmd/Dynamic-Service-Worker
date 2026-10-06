@@ -1,0 +1,105 @@
+CAHCE FIRST 
+request > cache ? if yes > cache 
+                 if no > Network > cache > response
+
+images, fonts, version js, versioned css
+
+
+
+NETWORK FIRST 
+request > 
+          Network > SUCCESS > response + cache
+                    FAIL  > cache
+
+api data / dynamic pages /  frequently changing content
+
+
+NETWORK ONLY
+request > Network > response
+
+no cache data
+
+
+CACHED ONLY
+request > cache > response
+
+useful for pre CACHED during installaton of an app
+
+
+STALE WHILE REVALIDATE
+request > cache  > return immediately > meanwhile  > network > update Cache
+
+user get Fast response
+cache is updated in the background
+
+
+//
+waitUntil()  API 
+respondWith()  API 
+
+
+waitUntil()  fundamental API event.waitUntil()
+
+suppose we wanna do some background work 
+
+event.waitUntil(
+    updateCache() 
+)   
+**  the event has happenned but do not consider this events asynchronous
+work finished yet.
+
+self.addEventListener("fetch", event => {
+    const request = event.request;
+
+    event.respondWith(
+        handleRequest()
+    )
+
+    event.waitUntil(
+        updateSomething()
+    )
+
+})
+
+
+
+"SERVICE WORKER = cacheFile  NO NO NO 
+
+THINK ::
+SERVICE WORKER = Programmable network proxy running in the browser
+
+** service worker only controls pages within its scope,
+and its need to be activated / controlling the relevant clients
+
+** navigator.serviceWorker.register("/sw.js");
+
+the location of sw.js affects its default scope.
+
+src / serviceWorker  / 
+                     sw.js 
+                     |
+                     config.js
+                     |
+                     router.js
+                     |
+                     strategies/ 
+                     |         cacheFirst.js
+                     |         |
+                     |         networkFirst.js
+                     |         |
+                     |         networkOnly.js
+                     |         |
+                     |         staleWhileRevalidate.js
+                     |         
+                     | cache /  
+                     |         cacheManager.js
+                     |         |   
+                     |         cacheKeys.js 
+                     |         |
+                     |         cacheCleanUp.js
+                     |         
+                     |
+                     | utils / 
+                              request.js
+                              |
+                              response.js
