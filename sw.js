@@ -5,7 +5,7 @@ const DYNAMIC_CACHE = 'dynamic-v3';
 const MAX_DYNAMIC_ITEMS = 50; // Limit dynamic cache size
 
 
-/ 2. INSTALL EVENT - Pre-caching
+// 2. INSTALL EVENT - Pre-caching
 self.addEventListener('install', event => {
   console.log('[SW] Installing');
   event.waitUntil(
@@ -16,6 +16,25 @@ self.addEventListener('install', event => {
       })
   );
   self.skipWaiting(); // Activate immediately
+});
+
+
+// 3. ACTIVATE EVENT - Clean old caches
+self.addEventListener('activate', event => {
+  console.log('[SW] Activating');
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(name => {
+          if (name!== STATIC_CACHE && name!== DYNAMIC_CACHE) {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim(); // Control all clients immediately
 });
 
 self.addEventListener("fetch", (event) => {
