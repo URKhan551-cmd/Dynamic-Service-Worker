@@ -1,6 +1,8 @@
 // in our project when api get call with fetch browser listen to it.
 
-const CACHE_VAR = "dynamic-v2";
+// const STATIC_CACHE = 'static-v3';
+const DYNAMIC_CACHE = 'dynamic-v3';
+const MAX_DYNAMIC_ITEMS = 50; // Limit dynamic cache size
 
 self.addEventListener("fetch", (event) => {
     // now how to work with request further
@@ -67,11 +69,11 @@ self.addEventListener("fetch", event => {
 // now we can see GET POST PUT DELETE PATCH in methods
 
 // and destination
-document
-script 
-style 
-image 
-font 
+// document
+// script 
+// style 
+// image 
+// font 
 
 
 // best way to code architecture
@@ -94,4 +96,16 @@ async function handleRequest(request){
 
     const response = await fetch(request);
     return response;
+}
+
+
+
+// Helper: Limit cache size (LRU cleanup)
+async function limitCacheSize(cacheName, maxItems) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  if (keys.length > maxItems) {
+    await cache.delete(keys[0]); // Delete oldest
+    limitCacheSize(cacheName, maxItems); // Recurse
+  }
 }
