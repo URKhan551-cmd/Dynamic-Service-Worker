@@ -4,6 +4,20 @@
 const DYNAMIC_CACHE = 'dynamic-v3';
 const MAX_DYNAMIC_ITEMS = 50; // Limit dynamic cache size
 
+
+/ 2. INSTALL EVENT - Pre-caching
+self.addEventListener('install', event => {
+  console.log('[SW] Installing');
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+     .then(cache => {
+        console.log('[SW] Precaching app shell');
+        return cache.addAll(STATIC_ASSETS);
+      })
+  );
+  self.skipWaiting(); // Activate immediately
+});
+
 self.addEventListener("fetch", (event) => {
     // now how to work with request further
     console.log("Request hit", event.request.url);
