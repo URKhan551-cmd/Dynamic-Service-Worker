@@ -1,11 +1,34 @@
 <!DOCTYPE html>
-<html>
-<head><title>Offline</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <title>Dynamic Service Worker Lab</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./app.js" defer></script>
+</head>
 <body>
-  <h1>You are offline</h1>
-  <p>Please check your internet connection.</p>
-  <a href="/">Go Home</a>
+  <main class="container">
+    <h1>Dynamic Service Worker Lab</h1>
+    <p>Learn how the browser caches resources and works offline.</p>
 
-  <script src="sw.js"></script>
+    <section class="status-card">
+      <h2>Service Worker Status</h2>
+      <p id="sw-status">Checking registration...</p>
+      <p id="network-status">Checking network...</p>
+    </section>
+
+    <button id="check-worker" type="button">
+      Check Service Worker
+    </button>
+  </main>
 </body>
 </html>
+
+
+<!-- - defer ensures the HTML is parsed before app.js executes.
+- sw-status is where we display registration information.
+- network-status displays the browser's current online/offline indication.
+- The button will help us inspect registration without reloading the page.
+The service worker is not loaded using a <script> tag. The browser loads it separately through navigator.serviceWorker.register(). -->
