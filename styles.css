@@ -1,0 +1,44 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, sans-serif;
+  background: #111827;
+  color: #f9fafb;
+  display: grid;
+  place-items: center;
+}
+
+.container {
+  width: min(90%, 620px);
+  padding: 2rem;
+}
+
+.status-card {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  background: #1f2937;
+}
+
+button {
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #60a5fa;
+  color: #111827;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+p {
+  line-height: 1.6;
+}
+
+
+
+The styling is deliberately minimal. We need a working application, not a complicated interface, while learning the service work
