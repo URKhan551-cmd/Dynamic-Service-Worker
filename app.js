@@ -13,7 +13,12 @@ async function registerServiceWorker(){
     // here registration is an object 
     statusElement.textContent =
       `Registered. Scope: ${registration.scope}`;
+// A successful registration does not necessarily mean that the worker has finished installing or is controlling the current page.
+// 3. Inspect the registration
+// console.log(registration.scope);
 
+
+// The scope identifies the URLs the worker is allowed to control. It is different from the location of the current page.
     console.log("Registration", registration);
     
   } catch (error){
@@ -32,7 +37,11 @@ checkButton.addEventListener("click", async () => {
   const registration = await navigator.serviceWorker.getRegistration();
   console.log("Current registration:", registration);
   console.log("Controlling worker:", navigator.serviceWorker.controller);
-
+// This returns the worker controlling the current page, or null if there isn't one. 
+  // A newly registered worker may not control the first page load.
+// 5. Handle failures
+// Registration may fail because of a missing file, invalid JavaScript, an unsuitable scope, 
+  // or an insecure context. The catch block gives us a starting point for debugging.
   statusElement.textContent = registration
     ? "A service worker registration exists."
     : "No registration found for this page.";
