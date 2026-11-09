@@ -1,0 +1,23 @@
+UNDERSTANDING THE CACHE API
+the browser exposes an API CacheStorage.
+its global interface is (caches).
+
+think of it as a collection of named caches. / each cache store request-response pairs.
+dynamic-sw-lab-v0
+    |
+    ^
+dynamic-sw-lab-v1  = current cache
+
+Methods.
+caches.open()  ===  open or create a cache.
+cache.add(request) === fetch a resource and store its response.
+cache.addAll(requests) === fetch and store multiple resources.
+cache.match(req) === Search for a matching response.
+cache.keys()  === return all caches names.
+cache.delete(name) ===  delete a named cache.
+
+Cache Storage is not the same as like browser's HTTP cache.
+
+cache storage is explicitly controled by application code.  we decide what to store, retrieve, update, and delete.
+
+IMPLEMENTATION create cache configuration in  ./sw/config.js  ****
