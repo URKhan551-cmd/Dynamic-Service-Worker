@@ -6,7 +6,7 @@ import { onInstall, onActivate } from "./sw/lifecycle";
 
 // here self refers to global worker context not window context
 // self does has browser apis  caches/fetch()/clients/self/URL
-self.addEventListener("install", fn());
+self.addEventListener("install", onInstall);
 
 
 // browser dispatch an install event
@@ -14,7 +14,7 @@ self.addEventListener("install", fn());
 // prepare initial app assets.
 // perform installation related synchrounously operat
 
-self.addEventListener("activate", fn());
+self.addEventListener("activate", onActivate);
 // after successful instalation, browser determine
 // when the new worker can activate.
 // removes obsolte caches
