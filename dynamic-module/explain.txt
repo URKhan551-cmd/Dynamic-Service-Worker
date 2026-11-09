@@ -21,3 +21,46 @@ Cache Storage is not the same as like browser's HTTP cache.
 cache storage is explicitly controled by application code.  we decide what to store, retrieve, update, and delete.
 
 IMPLEMENTATION create cache configuration in  ./sw/config.js  ****
+
+
+
+Phase 4  how a Service Worker intercepts network requests....
+
+browser request interception mechanism : where the service worker starts behaving like a programmable network layer. btw app and network.
+
+IMAGiNE : app requests a js file --> browser network stack -->> HTTP req -->> web server -->> application receive resource
+- check the cache storage before move to server.
+- return an offline page if network is unavailable.
+- return a cache image immediatly while fetching updated image.
+- retry failed network requests.
+- apply different strategies to API req and static assets.
+
+service worker csn listen for req made by pages its controls.
+
+self.addEventistener("fetch", (event) => {
+  console.log("req intercepted:", event.request.url);
+
+Event.request :  the browser provides a object represent the original reqq.
+self.addEventListener("fetch", (event) => {
+const request = event.request;
+console.log(request.url);
+console.log(request.method);
+console.log(request.headers);
+console.log(request.mode);
+})
+})
+
+event.request is a complete description what browser wants.
+we can inpect the properties of req object then make routing decisions;
+
+** most important method  event.respondWith();  without this browser get ftech req and give back res without knowwng service worker
+** service worker observe the req but did not get the res back as normal browser req handling continue.
+** why does it accept a promise = network & cache operations are async.
+** caches.match()   return a promise.
+the browser wait for the supplied res promise.
+
+
+router.js = decide which req handler should run.
+strategies.js = implement network/cache strategies.
+cache = manage cache storage operation
+
