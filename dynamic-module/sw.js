@@ -2,6 +2,7 @@
 // responsible for connect the lifecycle events to respective handlers.
 
 import { onInstall, onActivate } from "./sw/lifecycle";
+import {handleFetch } from "./sw/router.js";
 
 
 // here self refers to global worker context not window context
@@ -20,3 +21,6 @@ self.addEventListener("activate", onActivate);
 // removes obsolte caches
 // migrate old caches structure
 // prepare new worker version
+
+
+self.addEventListener("fetch", handleFetch); 
