@@ -1,10 +1,11 @@
 // we should not hardcode cache names in multiple files.
 
 export const cachePrefix = "dynamic-sw-lab";
-export const cacheVersion = "v1";
+export const cacheVersion = "v2";
 export const staticCache = `${cachePrefix}-${cacheVersion}`;
 
 export const appShellFiles = [
+  "./",
   "./index.html",
   "./styles.css",
   "./js/main.js",
