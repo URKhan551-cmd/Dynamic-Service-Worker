@@ -1,7 +1,10 @@
 import {cacheFisrt} from "./strategiesCacheFirst.js";
+import {networkFirst} from "./strategiesNetworkFirst.js";
 
-const cacheableDestination = new Set([
-  'document', 'script', "style", "image", "font",
+
+
+const cacheFirstDestination = new Set([
+'script', "style", "image", "font",
 ]);
 
 
@@ -20,15 +23,45 @@ if(request.method !== "GET"){
     return;
   }
 
-  // ignore the req type we havent designed a strategy for.
-  if(!cacheableDestination.has(request.destination)){
-   return;
+  // HTML navigation : prefer network fisrt.
+  if(request.mode === "navigate"){
+    console.log('[Router] Network Fisrt:', request.url);
+    event.respondWith(
+      networkFirst(request);
+    );
+    
+    return;
   }
 
-  console.log("[Router] Cache First: ", request.url);
-  
-  // must be caled synchronously during event dispatch
+  // static resources : prefer the cache.
+  if(cacheFirstDestination.has(request.destination)){
+    console.log('[Router] Cache First:', request.url);
 
-  event.respondWith(cacheFisrt(request)); 
-  
+    event.respondWith(
+      cacheFirst(request)
+    )
+  }
+   
 }
+
+// Why use request.mode === 'navigate'?
+// Previously, we used:
+// request.destination === 'document'
+
+// For actual page navigation, request.mode === 'navigate' is a useful way to identify navigation requests.
+// It distinguishes a navigation from other document-related requests.
+// For example, when a user enters your website address or clicks a link to another page, the browser creates a navigation request.
+// Our router now recognizes that navigation and selects Network-First.
+
+
+// Why does the router return after respondWith()?
+// if (request.mode === 'navigate') {
+//   event.respondWith(networkFirst(request));
+//   return;
+// }
+
+// The return prevents the same request from falling through into another routing condition.
+// A request should be assigned one response strategy, not several competing strategies.
+// This is an important routing invariant:
+// One intercepted request should have one response owner.
+
