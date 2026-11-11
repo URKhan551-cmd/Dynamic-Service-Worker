@@ -31,8 +31,10 @@
 
 // Because the server successfully responded. A 500 is a real server-side error, not proof that the network is unavailable.
 // An application might choose to serve stale data on certain server errors, but that is a separate policy decision. We shouldn't silently mix it into our basic Network-First strategy.
-
-import {staticCache} from "./config.js";
+/*
+import { staticCache } from "./config.js";
+import { fetchWithTimeout } from "./timeoutNetworkReq.js";
+const networkTimeout = 3000;
 
 async function networkFirst(request){
   // 1: req = GET only cache.
@@ -40,6 +42,8 @@ async function networkFirst(request){
     return fetch(request);
   }
 
+  let networkResponse;
+  
   // 2: open our Cache
   const cache = await caches.open(staticCache);
 
@@ -71,6 +75,8 @@ async function networkFirst(request){
     throw networkError;
   }
 }
+
+*/
 
 
 // Decision A — Why open the cache before the try block?
@@ -124,3 +130,49 @@ async function networkFirst(request){
 // But how does the Service Worker decide which strategy to use?
 // That's the router's responsibility.
 
+const networkTimeout = 3000;
+
+export async function networkFirst(request){
+  if(request.method !== "GET"){
+    return fetch(request);
+  }
+
+  let networkResponse;
+
+  // step 1: try the network with a time limit.
+  try{
+    networkResponse = await fetchWithTimeout(request, networkTimeout);
+  } catch (networkError){
+    console.warn('[Network Fisrt] network failed or timed out:', request.url, networkError);
+
+    // step 2: network failed try cached storage
+    const cache = await caches.open(staticCache);
+
+    const cachedResponse = await cache.match(request);
+    if(cachedResponse){
+      console.log('[Network Fisrt] Cache fallback:', request.url);
+      
+      return cachedResponse;
+    }
+
+    // step3: neither network nor cache could help.
+    throw networkError;
+  }
+
+// step 4: network succed cache succesful response.
+  if(networkResponse.ok){
+    try{
+      const cache = await caches.open(staticCache);
+
+      await cache.put(request, networkResponse.clone());
+
+      console.log('[Network FIsrt] cache updated successs.', request.url);
+      
+    } catch (cacheError){
+      console.warn('[Network First] cache update failed:', cacheError);
+    }
+  }
+
+  // step5 : return the network response;
+  return networkResponse;
+}
