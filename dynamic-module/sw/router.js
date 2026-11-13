@@ -1,6 +1,7 @@
 import {cacheFisrt} from "./strategiesCacheFirst.js";
 import {networkFirst} from "./strategiesNetworkFirst.js";
-
+import {cacheOnly} from "./strategiesCacheOnly.js";
+import { networkOnly } from "./strategiesNetworkOnly.js";
 
 
 const cacheFirstDestination = new Set([
@@ -23,6 +24,20 @@ if(request.method !== "GET"){
     return;
   }
 
+// rule2: offline fallback page is cache only
+  if(url.pathname === '/offline.html'){
+    console.log('[Router] Cache Only:', request.url);
+    event.respondWith(cacheOnly(request));
+   return;
+  }
+
+  // rule 3: API requests are network only
+  if(url.pathname.startsWith('./api/')){
+    console.log('[Router] Network Only:', request.url);
+    event.respondWith(networkOnly(request));
+    return;
+  }
+  
   // HTML navigation : prefer network fisrt.
   if(request.mode === "navigate"){
     console.log('[Router] Network Fisrt:', request.url);
@@ -39,7 +54,9 @@ if(request.method !== "GET"){
 
     event.respondWith(
       cacheFirst(request)
-    )
+    );
+
+    return;
   }
    
 }
@@ -64,4 +81,9 @@ if(request.method !== "GET"){
 // A request should be assigned one response strategy, not several competing strategies.
 // This is an important routing invariant:
 // One intercepted request should have one response owner.
+
+
+// A note about the API rule: This is an example route convention. It assumes your API endpoints 
+//   use the /api/ prefix. If you later use a separate API domain, 
+//   this same-origin router will intentionally leave those requests alone.
 
