@@ -1,7 +1,9 @@
 import {cacheFisrt} from "./strategiesCacheFirst.js";
-import {networkFirst} from "./strategiesNetworkFirst.js";
+// import {networkFirst} from "./strategiesNetworkFirst.js";
 import {cacheOnly} from "./strategiesCacheOnly.js";
 import { networkOnly } from "./strategiesNetworkOnly.js";
+
+import { handleNavigation } from "./navigationFallback.js";
 
 
 const cacheFirstDestination = new Set([
@@ -14,15 +16,18 @@ export function handleFetch(event){
   const request = event.request;  // extract the browser req  diagnose intrumentation/ observe req before decide how to handle it .
   const url = new URL(request.url);
 
-  // let browser handle the non GET req normally.
-if(request.method !== "GET"){
-  return;
-}
-
   // only handle resource form our own origin
   if(url.origin !== self.location.origin){
     return;
   }
+  
+  // let browser handle the non GET req normally.
+if(request.method !== "GET" && url.pathname === "./offline.html"){
+   event.respondWith(cacheOnly(request));
+  return;
+}
+
+
 
 // rule2: offline fallback page is cache only
   if(url.pathname === '/offline.html'){
@@ -39,17 +44,16 @@ if(request.method !== "GET"){
   }
   
   // HTML navigation : prefer network fisrt.
-  if(request.mode === "navigate"){
+  if(request.mode === "navigate" && request.method === "GET"){
     console.log('[Router] Network Fisrt:', request.url);
-    event.respondWith(
-      networkFirst(request);
-    );
+    event.respondWith(handleNavigation(request));
     
     return;
   }
 
   // static resources : prefer the cache.
-  if(cacheFirstDestination.has(request.destination)){
+  if(request.method === "GET" && 
+     cacheFirstDestination.has(request.destination)){
     console.log('[Router] Cache First:', request.url);
 
     event.respondWith(
