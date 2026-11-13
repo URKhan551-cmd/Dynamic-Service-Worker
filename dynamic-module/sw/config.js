@@ -2,7 +2,14 @@
 
 export const cachePrefix = "dynamic-sw-lab";
 export const cacheVersion = "v3";
-export const staticCache = `${cachePrefix}-${cacheVersion}`;
+export const staticCache = `${cachePrefix}-static-${cacheVersion}`;
+export const runTimeCache = `${cachePrefix}-runtime-${cacheVersion}`;
+// Responses discovered while the application runs.
+// Images · other eligible resources · runtime navigation responses
+export const runTimeMetaDataCache = `${cachePrefix}-metadata-${cacheVersion}`;
+// Metadata cache
+// Information about runtime entries, such as when each was stored.
+// Request URL → timestamp
 
 export const appShellFiles = [
   "./",
@@ -11,6 +18,12 @@ export const appShellFiles = [
   "./styles.css",
   "./js/main.js",
 ];
+
+export const runTimeCacheLimits = {
+  maxEntries: 100,
+  maxAgeSeconds: 7 * 24 * 60 * 60,
+};
+
 
 // imagine six months later we have 
 // static application files
