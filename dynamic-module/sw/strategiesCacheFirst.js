@@ -70,6 +70,8 @@
 // The cache consumes the clone; the browser receives the original.
 
 import {staticCache} from "./config.js";
+import { getRuntimeResponse, putRuntimeResponse } from "./cacheManager.js";
+
 
 export async function cacheFirst(request){
   // 1: only cache GET req
@@ -89,19 +91,28 @@ export async function cacheFirst(request){
     return cachedResponse;
   }
 
+
+  // checked the managed runtime cache
+ const runTimeResponse = await getRuntimeResponse(request);
+  if(runTimeResponse){
+    console.log('[Cache First] Runtime Cache hit:', request.url);
+    return runTimeResponse;
+  }
+  
   console.log("[Cached First]: Ccahe miss:", request.url);
 // 5: retrieve network response
   const networkResponse = await fetch(request);
 
-  // 6: cache only succeful response 
+  // 6: Store succesful same origin response succeful 
   if(networkResponse.ok){
-    await cache.put(request, networkResponse.clone());
-    console.log('[Cache first] cached:', request.url);
+    await putRuntimeResponse(request, networkResponse);
+  
   }
 
   // 7: return original response to the browser
   return networkResponse;
 };
+
 
 
 // fetch() normally resolves even if the server responds with HTTP 404 or 500.
@@ -119,4 +130,9 @@ export async function cacheFirst(request){
 
 
 // now we created the flow of algorithm but not yet connected it will be connected through router.js
+
+
+
+// when i passed networkResponse to putRuntimeResponse(); manager will clone() it and store it.
+// We have centralized the cloning responsibility in the cache manager. This makes the strategy simpler.
 
