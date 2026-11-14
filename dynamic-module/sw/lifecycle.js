@@ -1,4 +1,4 @@
-import {staticCache, appShellFiles } from "./config.js";
+import {staticCache, appShellFiles, cachePrefix, runTimeCache, runTimeMetaDataCache } from "./config.js";
 
 export function onInstall(event){
     console.log("Service worker install event started");
@@ -27,13 +27,15 @@ export function onActivate(event){
     console.log("Service Worker Activation event start..");
 
     event.waitUntil((async () => {
+        const currentCaches = new Set([staticCache, runTimeCache, runTimeMetaDataCache]);
+        
         // get every cache name.
         const cacheNames = await caches.keys();
 
         // 2 identify outdated cache belonging to our app
         const outdatedCaches = cacheName.filter(cacheName => {
             return (
-                cacheName.startsWith(cachePrefix) && cacheName !== staticCache
+                cacheName.startsWith(cachePrefix) && !currentCaches.has(cacheName)
             );
         });
 
@@ -49,4 +51,4 @@ export function onActivate(event){
 )
 }
 
-
+// Important: Our onActivate() does not call clients.claim() yet. That is a separate lifecycle decision, and we'll cover it when we study service worker updates and client control.
