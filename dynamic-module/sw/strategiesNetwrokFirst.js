@@ -130,6 +130,15 @@ async function networkFirst(request){
 // But how does the Service Worker decide which strategy to use?
 // That's the router's responsibility.
 
+
+// *************
+// connect networkfirst to runTimeCache. for its fallBack and updates
+// we should check static and runtime cache when the netwrok fails.\
+import {getRuntimeResponse, putRuntimeResponse} from "./cacheManager.js";
+import {staticCache} from "./config.js";
+import {fetchWithTimeout} from "./utilResponse.js";
+
+
 const networkTimeout = 3000;
 
 export async function networkFirst(request){
@@ -154,25 +163,31 @@ export async function networkFirst(request){
       
       return cachedResponse;
     }
+    
 
-    // step3: neither network nor cache could help.
+    // step3: try managed runtime cache.
+    const runTimeResponse = await getRuntimeResponse(request);
+    if(runTimeResponse){
+      console.log('[Network First] Runtime fallback:', request.url);
+      return runTimeResponse;
+    }
+    
     throw networkError;
   }
 
 // step 4: network succed cache succesful response.
-  if(networkResponse.ok){
-    try{
-      const cache = await caches.open(staticCache);
-
-      await cache.put(request, networkResponse.clone());
-
-      console.log('[Network FIsrt] cache updated successs.', request.url);
-      
-    } catch (cacheError){
-      console.warn('[Network First] cache update failed:', cacheError);
-    }
-  }
-
+ if(networkResponse.ok){
+   try{
+     await putRuntimeResponse(request, networkResponse);
+   } catch(cacheError){
+     console.warn('[Network First] Runtime cache update failed:', cacheError);
+   }
+ }
   // step5 : return the network response;
   return networkResponse;
 }
+
+// This preserves the important distinction we established in the timeout phase:
+// A cache failure must not cause us to discard a successful network response.
+// It also means a navigation fallback can retrieve an app-shell page from the static cache, even if it has no runtime entry.
+// A limitation to keep in mind: this initial manager updates cachedAt whenever it stores a response. It does not track when a resource was last read. That is why the entry-limit policy is FIFO, not LRU.
