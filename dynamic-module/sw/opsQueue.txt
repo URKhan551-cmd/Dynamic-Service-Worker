@@ -1,0 +1,102 @@
+Where should the queue be used in our project?
+We should serialize operations that modify related cache state.
+
+For example:
+- Writing a runtime response and its metadata.
+- Removing an expired response and its metadata.
+- Enforcing the maximum entry limit.
+- Rolling back a partially completed write.
+We should not automatically put every operation in the queue.
+Consider a Network-First request:
+
+const response = await fetch(request);
+
+This is network work. It might take three seconds or more.
+If we put the network fetch inside the queue, every other cache mutation would have to wait for it.
+That would create unnecessary contention.
+
+A better sequence is:
+Request arrives
+      |
+      v
+Fetch from network
+      |
+      v
+Network response received
+      |
+      v
+Enter cache mutation queue
+      |
+      v
+Write response + metadata
+      |
+      v
+Enforce cache limit
+      |
+      v
+Leave queue
+
+The queue should protect the critical section: the part of the operation where shared cache state is being modified.
+This is the same general principle used in databases, file systems, and concurrent applications.
+
+
+7. Important limitation: this is not a global mutex
+Our queue variable exists inside one JavaScript execution context.
+
+It coordinates operations that use this particular queue instance. It does not automatically coordinate:
+- Another service worker instance.
+- A different browser tab running its own JavaScript.
+- Another script that directly modifies the same Cache Storage entries.
+- Code that bypasses runExclusive().
+So this is in-process coordination, not a transaction or a browser-wide lock.
+
+For our learning project, it is a useful first implementation. Later, we can examine stronger cross-context coordination and recovery mechanisms.
+
+Single-threaded JavaScript and concurrency
+Your answer is mostly correct.
+
+You said:
+One thread can execute many operations concurrently through explicit control.
+
+The important distinction is between concurrency and parallelism.
+- Concurrency: Multiple operations make progress during overlapping periods. Their execution can interleave.
+- Parallelism: Multiple operations execute at the exact same time on different processing resources.
+JavaScript's main execution thread generally runs one JavaScript task at a time. However, asynchronous operations can overlap.
+const responseA = fetch('/a');
+const responseB = fetch('/b');
+
+const [a, b] = await Promise.all([
+  responseA,
+  responseB,
+]);
+both network requests can be in progress concurrently, even though javascript isnot executing callbacks 
+simultanously on the same thread.
+
+
+Queue recovery after rejection
+(Correct)
+
+Exactly. The queue must remain fulfilled after an individual operation fails, so future operations can continue.
+
+But the original operation must still report its error to its caller.
+
+That's why we maintain two promises:
+- result: the actual outcome.
+- queue: the recovered scheduling chain.
+
+
+4 : Critical section
+(Correct concept)
+
+You wrote "critical storage." The correct term is critical section.
+
+A critical section is the portion of code that accesses or modifies shared state and therefore needs coordination.
+
+One important distinction: our promise queue isn't a traditional operating-system mutex that locks a memory region. It is an asynchronous serialization mechanism that provides mutex-like behavior for cooperating operations.
+
+5: Separate processes or instances
+(Correct)
+
+Exactly. The queue is local to the JavaScript execution context in which it was created.
+
+A separate context has a separate queue variable.
