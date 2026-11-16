@@ -20,3 +20,76 @@ export function runExcluisve(operation){
 
 // result = Reports the outcome of this operation to its caller.
 // queue = Ensure the next operation can execute.
+
+
+// TEMPORRAY File.
+import { runExclusive } from "./operationQueue.js";
+// ms = mili seconds
+function wait(ms){
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  })
+};
+
+
+async function operationA(){
+  console.log("A started");
+  await wait(1000);
+  console.log("A finished");
+};
+
+
+async function operationB(){
+  console.log("B started");
+  await wait(500);
+  console.log("B finished");
+};
+
+async function operationC(){
+  console.log("C started");
+  await wait(300);
+  console.log("C finished");
+};
+
+const results = await Promise.all([
+  runExclusive(operationA),
+  runExclusive(operationB),
+  runExclusive(operationC),
+]);
+
+console.log("All operstions completed:", results);
+
+// Expected execution order:
+// A started
+// A finished
+// B started
+// B finished
+// C started
+// C finished
+// All operations completed
+
+// Although all three calls were submitted through Promise.all, their operations execute sequentially because the queue controls when each one starts.
+
+// Promise.all does not itself serialize anything. The queue does.
+
+// TRY FAILURE RECIVERY TOO : 
+async function failingOperation(){
+  console.log("Failure operation started");
+  throw new Error("Simulate failure");
+}
+
+try {
+  await runExclusive(failingOperation);
+} catch (error){
+  console.log("Caller received:", error.message);
+}
+
+await runExclusive(operationB);
+
+// Expected behavior:
+// Failure operation started
+// Caller received: Simulated failure
+// B started
+// B finished
+
+// The failed operation rejects for its caller, but the queue remains usable.
