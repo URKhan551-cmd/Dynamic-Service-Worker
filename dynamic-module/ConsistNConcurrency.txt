@@ -1,0 +1,134 @@
+runtime cache has two pieces of data:
+1. Runtime response cache — stores the actual response, such as A.webp.
+2. Metadata cache — stores information about that response, such as when it was cached.
+These two caches represent one logical record, even though the browser stores them separately.
+
+That creates an important engineering problem:
+
+How do we prevent concurrent operations from leaving the two caches in an inconsistent state?
+
+We'll build the understanding first, then implement a promise queue to coordinate cache mutations.
+1. JavaScript is single-threaded, but asynchronous operations can still race
+Consider this statement:
+JavaScript executes one piece of synchronous code at a time.
+
+That is generally true for a single JavaScript execution context. But it does not mean an entire asynchronous operation executes without interruption.
+
+Look at this function:
+async function saveResource(request, response) {
+  await runtimeCache.put(request, response.clone());
+
+  await metadataCache.put(
+    createMetadataKey(request),
+    createMetadataResponse()
+  );
+}
+
+There are two separate asynchronous operations:
+- Write the response.
+- Write the metadata.
+When JavaScript reaches the first await, it suspends this function until that promise settles. Other event handlers and asynchronous tasks can run in the meantime.
+
+This means another request can start its own cache operation before the first request finishes.
+
+2. Understand the race condition
+Imagine two requests arrive close together:
+- Request A wants to cache A.webp.
+- Request B wants to cache B.webp.
+Both requests also need to enforce the maximum cache size of 100 entries.
+
+Without coordination
+
+Request A
+
+1. Write A.webp
+
+2. Write metadata A
+
+3. Check cache size
+
+Request B
+
+1. Write B.webp
+
+2. Write metadata B
+
+3. Check cache size
+
+Their asynchronous operations can interleave. Neither request automatically waits for the other to finish.
+A possible execution order
+1. A writes A.webp.
+2. B writes B.webp.
+3. A writes metadata for A.
+4. B writes metadata for B.
+5. A reads the cache entries and starts cleanup.
+6. B reads the cache entries and also starts cleanup.
+Both cleanup operations may make decisions using overlapping observations of the cache.
+
+This is a race condition: the final outcome can depend on the order in which asynchronous operations complete.
+
+It does not mean that every concurrent cache operation will fail. It means your design cannot assume that the operations happen in the order you intended unless you explicitly coordinate them.
+
+
+3. What consistency are we trying to protect?
+For every runtime response, we want this relationship:
+
+Runtime cache
+
+A.webp → Response
+
+Same resource identity
+
+Metadata cache
+
+A.webp → { cachedAt: timestamp }
+
+The response and its metadata should either both exist or be treated as an invalid/incomplete cache entry.
+
+This is a consistency invariant.
+
+An invariant is a condition that should remain true throughout the operation of a system.
+
+Our intended invariant is:
+- A valid runtime entry has corresponding metadata.
+- An entry without metadata is not trusted.
+- Removing a runtime entry should also remove its metadata.
+- Cache size enforcement must not accidentally remove entries that another operation has just written.
+There is a subtle distinction here: Cache Storage does not provide a transaction spanning two named caches. We have to coordinate and recover from partial failures ourselves.
+
+
+The solution: serialize cache mutations
+We need a mechanism that ensures one cache mutation completes before the next mutation begins.
+
+This is called serialization.
+
+Instead of allowing:
+Operation A ──────────────┐
+Operation B ──────────────┤ running concurrently
+Operation C ──────────────┘
+
+We want:
+Operation A → Operation B → Operation C
+
+A promise queue can provide this behavior.
+First, understand the queue itself
+A Promise represents an operation that may complete in the future.
+
+A Promise chain gives us a way to say:
+When the previous operation finishes, execute the next operation.
+
+For example:
+
+const firstResolve = Promise.resolve();
+const second = firstResolve.then(() => {
+ console.log("Operation A");
+});
+
+const third = second.then(() => {
+console.log("Operation B");
+});
+
+The order is guaranteed:
+1. first is already fulfilled.
+2. The callback for second runs.
+3. After second fulfills, the callback for third runs.
