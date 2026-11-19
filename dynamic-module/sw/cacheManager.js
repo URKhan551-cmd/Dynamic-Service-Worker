@@ -62,6 +62,9 @@ const {
 } = RUNTIME_CACHE_LIMITS;
 
 // Create a separate metadata key for each resource URL.
+// Creates a synthetic Request that acts as a key in the metadata cache.
+// You need a deterministic 1-to-1 mapping from resource URL -> metadata entry. You can't use the original request directly as key in the metadata cache because you'd collide with the real cache. So you create a fake URL like https://yourapp.com/**sw_metadata**?url=https://yourapp.com/api/user
+// This turns any resource URL into a unique metadata key. Using Request object as key is required by Cache API - cache.match() expects a Request.
 function createMetadataKey(request) {
   const metadataURL = new URL(
     '/__sw_metadata__',
@@ -74,6 +77,18 @@ function createMetadataKey(request) {
 }
 
 // Internal function: must only be called while holding the queue.
+// This is the core read logic. The Unsafe suffix means: not thread-safe, must be called inside runExclusive.
+// caches.open both caches
+// runtimeCache.match(request) - try to find response
+// If not found -> undefined (cache miss)
+// metadataCache.match(metadataKey) - find its timestamp
+// If response exists but metadata doesn't: Delete the response. This is self-healing. A response without metadata cannot be trusted - you don't know its age. Could be from an old version of code or a partial write.
+// Parse metadata JSON, get cachedAt
+// Validate cachedAt:
+// !Number.isFinite or <=0 or > now -> invalid. Future timestamp means clock skew or corrupted data. Treat as invalid, delete both.
+// Calculate ageSeconds = (now - cachedAt)/1000
+// If ageSeconds > maxAgeSeconds -> expired, delete both, return undefined
+// Else return cachedResponse
 async function getRuntimeResponseUnsafe(request) {
   const runtimeCache = await caches.open(RUNTIME_CACHE);
   const metadataCache = await caches.open(RUNTIME_METADATA_CACHE);
@@ -150,6 +165,10 @@ async function getRuntimeResponseUnsafe(request) {
 
 // Public read operation.
 // It is queued because an expiration check can delete cache entries.
+// Why queued? Because inside getRuntimeResponseUnsafe you delete entries if they're expired or invalid. Delete is a write. If two fetch handlers call this at same time without a queue, you get:
+// Thread A reads -> sees expired -> starts delete
+// Thread B reads -> still sees old entry before A finishes delete -> returns stale data
+// runExclusive makes the whole read-check-delete atomic.
 export function getRuntimeResponse(request) {
   return runExclusive(() => {
     return getRuntimeResponseUnsafe(request);
@@ -157,6 +176,17 @@ export function getRuntimeResponse(request) {
 }
 
 // Internal function: must only be called while holding the queue.
+// FIFO eviction to prevent unbounded growth.
+// Get all keys: runtimeCache.keys() - all requests in cache
+// If length <= maxEntries -> do nothing
+// For each request, fetch its metadata to get cachedAt. If metadata is broken, set cachedAt = 0 so it gets evicted first - oldest/broken first.
+// Sort entries by cachedAt ascending - oldest first
+// Calculate excessCount = entries.length - maxEntries
+// Take slice(0, excessCount) - the oldest N
+// Delete both response and metadata for each, using Promise.
+// Promise.allSettled not all: If one delete fails (QuotaExceeded, etc.), you don't want to abort all evictions. You log failures and continue.
+// Sorting by cachedAt gives FIFO, not LRU. This is simpler and cheaper than LRU which would require updating metadata on every read. FIFO is fine for runtime cache.
+// Setting broken metadata to 0 is a smart trick - ensures corrupted entries are the first to be purged.
 async function enforceRuntimeCacheLimitUnsafe() {
   const runtimeCache = await caches.open(RUNTIME_CACHE);
   const metadataCache = await caches.open(RUNTIME_METADATA_CACHE);
@@ -230,6 +260,13 @@ async function enforceRuntimeCacheLimitUnsafe() {
 
 // Public version for standalone use.
 // Do not call this public wrapper from inside another queued operation.
+// Public safe wrapper for the eviction. Again, needs to be exclusive because it reads keys() and deletes. Without a lock, you could have:
+// Thread A gets keys -> length 101
+// Thread B adds entry -> length 102
+// Thread A evicts 1 entry based on stale count
+
+// Queue prevents that.
+// Also note the comment: Do not call this public wrapper from inside another queued operation. Because runExclusive inside runExclusive would deadlock.
 export function enforceRuntimeCacheLimit() {
   return runExclusive(() => {
     return enforceRuntimeCacheLimitUnsafe();
@@ -238,6 +275,19 @@ export function enforceRuntimeCacheLimit() {
 
 // Public write operation.
 // Response, metadata, rollback and eviction share one critical section.
+// Open both caches
+// Save previous state: previousResponse and previousMetadata. This is for rollback.
+// Try to write:
+// runtimeCache.put(request, response.clone()) - you MUST clone because a Response body can only be read once. If you don't clone, the caller can't use it.
+// metadataCache.put(metadataKey, new Response(JSON.stringify({cachedAt: Date.now()}))) - fresh timestamp
+// If write fails (QuotaExceeded, storage full, etc.):
+// Try to rollback to previous state
+// If there was a previous response, put it back, else delete
+// Same for metadata
+// Use allSettled for rollback - even rollback can fail, log it but don't hide original error
+// throw writeError - preserve original error so caller knows it failed
+// If write succeeds:
+// Call enforceRuntimeCacheLimitUnsafe() directly, NOT the public wrapper (to avoid deadlock). This is inside same queue, so eviction happens atomically with the put.
 export function putRuntimeResponse(request, response) {
   return runExclusive(async () => {
     const runtimeCache = await caches.open(RUNTIME_CACHE);
@@ -327,6 +377,15 @@ export function putRuntimeResponse(request, response) {
 // This is FIFO-style eviction: first in, first out.
 // It is not true LRU (Least Recently Used). We'll examine that distinction shortly.
 
-import {
-  
-}
+
+This is a mini database transaction pattern.
+
+Atomicity: Put response + put metadata + eviction all happen in one queue. You never have a window where response exists without metadata.
+Rollback: Most SW caches just do cache.put() and if it fails halfway, you end up with half-written state. Here they restore the previous good state.
+Clone on read/write: response.clone() is mandatory in Cache API. Original response stream would be consumed otherwise.
+Direct call to unsafe eviction: Shows deep understanding of the queue. Calling the public version would enqueue a second task inside the first task -> deadlock.
+
+Code
+read:  match -> check metadata -> validate age -> return or self-clean
+write: save old -> put new + put metadata -> evict -> or rollback on failure
+all operations: runExclusive queue to prevent race
