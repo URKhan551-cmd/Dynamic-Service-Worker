@@ -71,6 +71,7 @@
 
 import {staticCache} from "./config.js";
 import { getRuntimeResponse, putRuntimeResponse } from "./cacheManager.js";
+import { fetchDeduplicated } from "./utilInFlightReq.js";
 
 
 export async function cacheFirst(request){
@@ -101,7 +102,7 @@ export async function cacheFirst(request){
   
   console.log("[Cached First]: Ccahe miss:", request.url);
 // 5: retrieve network response
-  const networkResponse = await fetch(request);
+  const networkResponse = await fetchDeduplicated(request);
 
   // 6: Store succesful same origin response succeful 
   if(networkResponse.ok){
