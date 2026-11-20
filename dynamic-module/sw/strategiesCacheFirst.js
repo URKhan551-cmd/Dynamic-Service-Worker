@@ -1,4 +1,4 @@
-// *******************
+  // *******************
 // const cachedResponse = await cache.match(request);
 
 
@@ -83,7 +83,7 @@ export async function cacheFirst(request){
   const cache = await caches.open(staticCache);
 
   // 3: look for an existing cache response
-  const cachedResponse = await catch.match(request);
+  const cachedResponse = await cache.match(request);
 
   // 4: return immmediate cache hit.
   if(cachedResponse){
@@ -105,8 +105,11 @@ export async function cacheFirst(request){
 
   // 6: Store succesful same origin response succeful 
   if(networkResponse.ok){
+    try {
     await putRuntimeResponse(request, networkResponse);
-  
+    } catch (cacheError){
+      console.warn("[Cache First] could not update runtime cache:", cacheError);
+    }
   }
 
   // 7: return original response to the browser
