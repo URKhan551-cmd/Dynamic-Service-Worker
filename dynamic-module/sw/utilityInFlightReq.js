@@ -79,9 +79,9 @@ function createRequestKey(reuest){
   return `${request.method}:${request.url}`;
 }
 
-export async function fetchDeduplicated(request){
+export async function fetchDeduplicated(request, fetcher = (req) => fetch(req)){
   if(request.method !== "GET"){
-    return fetch(request);
+    return fetcher(request);
   }
 
   const key = createRequestKey(request)
@@ -99,7 +99,7 @@ export async function fetchDeduplicated(request){
   console.log("[Single flight] Starting:", request.url);
 
   // Start exactly one fetch for this key.
-  const requestPromise = fetch(request);
+  const requestPromise = fetcher(request);
   inflightRequests.set(key, requestPromise);
   try{
     const response = await requestPromise;
