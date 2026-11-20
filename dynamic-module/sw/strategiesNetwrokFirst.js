@@ -137,6 +137,7 @@ async function networkFirst(request){
 import {getRuntimeResponse, putRuntimeResponse} from "./cacheManager.js";
 import {staticCache} from "./config.js";
 import {fetchWithTimeout} from "./utilResponse.js";
+import { fetchDeduplicated } from "./utilityInFlightReq.js";
 
 
 const networkTimeout = 3000;
@@ -150,7 +151,9 @@ export async function networkFirst(request){
 
   // step 1: try the network with a time limit.
   try{
-    networkResponse = await fetchWithTimeout(request, networkTimeout);
+    // this preserve the timout behavoiur. the shared network operation still subject to timeout.and 
+    // all callers joining that operation share its result or failure.
+    networkResponse = await fetchDeduplicated(request, (req) => fetchWithTimeout(networkTimeout));
   } catch (networkError){
     console.warn('[Network Fisrt] network failed or timed out:', request.url, networkError);
 
